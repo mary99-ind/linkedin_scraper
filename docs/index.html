@@ -1332,7 +1332,7 @@
 
             try {
                 // 1. Trigger GitHub Actions workflow via API
-                const resp = await fetch('https://api.github.com/repos/TeoPaso/linkedin_scraper/actions/workflows/daily_scrape.yml/dispatches', {
+                const resp = await fetch('https://api.github.com/repos/mary99-ind/linkedin_scraper/actions/workflows/daily_scrape.yml/dispatches', {
                     method: 'POST',
                     headers: {
                         'Authorization': `token ${githubPat}`,
