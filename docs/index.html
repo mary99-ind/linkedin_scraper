@@ -2103,7 +2103,7 @@
                 });
             });
 
-            if (!appData.uiState) appData.uiState = { page: 1, limit: 10, sortCol: 'date', sortDir: 'desc', filters: { date: [], keyword: '', category: '', scores: [], liked: '', company: '', title: '', applied: '', excludeZero: false } };
+            if (!appData.uiState) appData.uiState = { page: 1, limit: 10, sortCol: 'date', sortDir: 'desc', filters: { date: [], keyword: '', category: '', scores: [], liked: '', company: '', title: '', applied: '', excludeZero: false, onlyZero: false } };
             const state = appData.uiState;
 
             // --- FILTERING ---
@@ -2128,6 +2128,7 @@
                     if (state.filters.applied === 'not-applied' && item.j.applied === true) return false;
                 }
                 if (state.filters.excludeZero && item.j.fit_score === 0) return false;
+                if (state.filters.onlyZero && item.j.fit_score !== 0) return false;
                 return true;
             });
 
@@ -2273,7 +2274,10 @@
                         <div class="score-quadrant ${state.filters.scores && state.filters.scores.includes('tiera') ? 'active' : ''}" data-score="tiera" title="Tier A" style="background: ${state.filters.scores && state.filters.scores.includes('tiera') ? 'rgba(0,255,204,0.2)' : '#2c2c2c'}; border: 1px solid ${state.filters.scores && state.filters.scores.includes('tiera') ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; height: 38px; font-size: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; transition: all 0.2s;">⭐</div>
                         <div class="score-quadrant ${state.filters.scores && state.filters.scores.includes('tierb') ? 'active' : ''}" data-score="tierb" title="Tier B" style="background: ${state.filters.scores && state.filters.scores.includes('tierb') ? 'rgba(0,255,204,0.2)' : '#2c2c2c'}; border: 1px solid ${state.filters.scores && state.filters.scores.includes('tierb') ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; height: 38px; font-size: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; transition: all 0.2s;">✓</div>
                         <div class="score-quadrant ${state.filters.scores && state.filters.scores.includes('scartato') ? 'active' : ''}" data-score="scartato" title="Scartato" style="background: ${state.filters.scores && state.filters.scores.includes('scartato') ? 'rgba(0,255,204,0.2)' : '#2c2c2c'}; border: 1px solid ${state.filters.scores && state.filters.scores.includes('scartato') ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; height: 38px; font-size: 24px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; transition: all 0.2s;">❌</div>
-                        <div class="score-exclude-zero ${state.filters.excludeZero ? 'active' : ''}" style="grid-column: 1 / -1; background: ${state.filters.excludeZero ? 'rgba(0,255,204,0.2)' : '#2c2c2c'}; border: 1px solid ${state.filters.excludeZero ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; height: 32px; font-size: 0.9em; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; transition: all 0.2s; margin-top: 2px;" title="Nascondi offerte con score a 0 spaccato">🚫 No Score 0</div>
+                        <div style="grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-top: 2px;">
+                            <div class="score-exclude-zero ${state.filters.excludeZero ? 'active' : ''}" style="background: ${state.filters.excludeZero ? 'rgba(0,255,204,0.2)' : '#2c2c2c'}; border: 1px solid ${state.filters.excludeZero ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; height: 32px; font-size: 0.85em; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; transition: all 0.2s;" title="Nascondi offerte con score a 0 spaccato">🚫 No 0</div>
+                            <div class="score-only-zero ${state.filters.onlyZero ? 'active' : ''}" style="background: ${state.filters.onlyZero ? 'rgba(0,255,204,0.2)' : '#2c2c2c'}; border: 1px solid ${state.filters.onlyZero ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; height: 32px; font-size: 0.85em; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; transition: all 0.2s;" title="Mostra SOLO offerte con score a 0 spaccato">🎯 Solo 0</div>
+                        </div>
                     </div>
                 </div>
 
@@ -2748,6 +2752,18 @@
                 btnExcludeZero.addEventListener('click', () => {
                     if (!appData.uiState) return;
                     appData.uiState.filters.excludeZero = !appData.uiState.filters.excludeZero;
+                    if (appData.uiState.filters.excludeZero) appData.uiState.filters.onlyZero = false;
+                    appData.uiState.page = 1;
+                    render();
+                });
+            }
+
+            const btnOnlyZero = document.querySelector('.score-only-zero');
+            if (btnOnlyZero) {
+                btnOnlyZero.addEventListener('click', () => {
+                    if (!appData.uiState) return;
+                    appData.uiState.filters.onlyZero = !appData.uiState.filters.onlyZero;
+                    if (appData.uiState.filters.onlyZero) appData.uiState.filters.excludeZero = false;
                     appData.uiState.page = 1;
                     render();
                 });
@@ -2791,7 +2807,7 @@
             if (btnClear) {
                 btnClear.addEventListener('click', () => {
                     if (!appData.uiState) return;
-                    appData.uiState.filters = { date: [], keyword: '', category: '', scores: [], liked: '', company: '', title: '', applied: '' };
+                    appData.uiState.filters = { date: [], keyword: '', category: '', scores: [], liked: '', company: '', title: '', applied: '', excludeZero: false, onlyZero: false };
                     appData.uiState.page = 1;
                     render();
                 });
