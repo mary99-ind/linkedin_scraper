@@ -76,12 +76,11 @@ def get_gemini_client():
 def generate_single_search_query(
     profile: str, config: dict, search_memory: list
 ) -> dict:
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    if not gemini_key:
-        print("ERRORE: Variabile d'ambiente GEMINI_API_KEY non impostata.")
+    try:
+        client = get_gemini_client()
+    except Exception as e:
+        print(f"ERRORE: Inizializzazione Gemini fallita: {e}")
         sys.exit(1)
-
-    client = genai.Client(api_key=gemini_key)
 
     memory_summary = ""
     if search_memory:
@@ -204,8 +203,7 @@ def evaluate_job_with_gemini(
     job: dict, profile: str, liked_history: str = "", disliked_history: str = ""
 ) -> JobEvaluation:
     """Valuta il fit tra l'offerta di lavoro e il profilo del candidato usando Gemini."""
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=gemini_key)
+    client = get_gemini_client()
 
     preferences_section = ""
     if liked_history or disliked_history:
@@ -299,25 +297,32 @@ Verifica la fascia:
 
 def process_and_evaluate_job(url: str, job_store: dict, profile: str, liked_history: str, disliked_history: str):
     """Esegue la valutazione in background e salva su db."""
-    data = job_store.get(url)
-    if not data or data.get("fit_score") is not None:
-        return
-    
-    job_data = data["job_data"]
-    title = job_data.get("title", "Unknown Title")
-    company = job_data.get("companyName", "Unknown Company")
-    
-    print(f"  [Background] Valutazione: {title} @ {company}...")
-    evaluation = evaluate_job_with_gemini(job_data, profile, liked_history, disliked_history)
-    
-    data["fit_score"] = evaluation.fit_score
-    data["reasoning"] = evaluation.reasoning
-    data["fit_score_reasoning"] = evaluation.fit_score_reasoning
-    data["highlighted_description"] = evaluation.highlighted_description
-    data["compensation"] = evaluation.compensation
-    
-    db.save_single_job(url, data)
-    print(f"  [Background] -> Score {evaluation.fit_score} ({title})")
+    try:
+        data = job_store.get(url)
+        if not data or data.get("fit_score") is not None:
+            return
+        
+        job_data = data["job_data"]
+        title = job_data.get("title", "Unknown Title")
+        company = job_data.get("companyName", "Unknown Company")
+        
+        print(f"  [Background] Valutazione: {title} @ {company}...")
+        evaluation = evaluate_job_with_gemini(job_data, profile, liked_history, disliked_history)
+        
+        data["fit_score"] = evaluation.fit_score
+        data["reasoning"] = evaluation.reasoning
+        data["fit_score_reasoning"] = evaluation.fit_score_reasoning
+        data["highlighted_description"] = evaluation.highlighted_description
+        data["compensation"] = evaluation.compensation
+        
+        # Remove needs_evaluation since it was successfully evaluated
+        from firebase_admin import firestore
+        data["needs_evaluation"] = firestore.DELETE_FIELD
+        
+        db.save_single_job(url, data)
+        print(f"  [Background] -> Score {evaluation.fit_score} ({title})")
+    except Exception as e:
+        print(f"  [Background] ERRORE IMPREVISTO per {url}: {e}")
 
 def categorize_jobs_with_gemini(
     uncategorized_jobs: dict, current_categories: list
@@ -325,8 +330,7 @@ def categorize_jobs_with_gemini(
     if not uncategorized_jobs:
         return {"job_labels": {}, "new_categories": []}
 
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    client = genai.Client(api_key=gemini_key)
+    client = get_gemini_client()
 
     jobs_text = ""
     for i, (url, job) in enumerate(uncategorized_jobs.items()):
@@ -754,6 +758,7 @@ def _run_scraper(config, profile):
                     "first_seen": execution_id,
                     "execution_id": execution_id,
                     "keyword": keyword,
+                    "needs_evaluation": True,
                 }
                 job_store[job_url] = new_data
                 
