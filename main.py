@@ -746,21 +746,27 @@ def _run_scraper(config, profile):
             if len(top_titles) < 5 and title not in top_titles:
                 top_titles.append(title)
 
-            if job_url not in job_store:
+            is_new = job_url not in job_store
+            needs_eval = not is_new and job_store.get(job_url, {}).get("fit_score") is None
+
+            if is_new or needs_eval:
                 if db.is_stop_requested():
                     break
                 
-                new_data = {
-                    "job_data": job,
-                    "fit_score": None,
-                    "reasoning": None,
-                    "category": None,
-                    "first_seen": execution_id,
-                    "execution_id": execution_id,
-                    "keyword": keyword,
-                    "needs_evaluation": True,
-                }
-                job_store[job_url] = new_data
+                if is_new:
+                    new_data = {
+                        "job_data": job,
+                        "fit_score": None,
+                        "reasoning": None,
+                        "category": None,
+                        "first_seen": execution_id,
+                        "execution_id": execution_id,
+                        "keyword": keyword,
+                        "needs_evaluation": True,
+                    }
+                    job_store[job_url] = new_data
+                else:
+                    job_store[job_url]["needs_evaluation"] = True
                 
                 # Invia il lavoro alla coda per la valutazione in background
                 executor.submit(
@@ -768,8 +774,9 @@ def _run_scraper(config, profile):
                     job_url, job_store, profile, liked_history, disliked_history
                 )
                 
-                new_jobs_count += 1
-                jobs_scraped_this_run += 1
+                if is_new:
+                    new_jobs_count += 1
+                    jobs_scraped_this_run += 1
 
         fruitful = new_jobs_count > 0
 
